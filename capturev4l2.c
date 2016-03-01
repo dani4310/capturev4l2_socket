@@ -120,7 +120,14 @@ int print_caps(int fd, int sockfd)
 		fmt.fmt.pix.height = height;
 		//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
 		//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY;
-		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
+		if(strncmp(frame_fmt,"MJPG",4) == 0){
+			fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
+		}else if(strncmp(frame_fmt,"H264",4)){
+			fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_H264;
+		}else{
+			fprintf(stderr,"formate error!\n");
+		}
+		
 		fmt.fmt.pix.field = V4L2_FIELD_NONE;
 
 		if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
@@ -139,6 +146,9 @@ int print_caps(int fd, int sockfd)
 						fmt.fmt.pix.height,
 						fourcc,
 						fmt.fmt.pix.field);
+		n = write(sockfd,fourcc,5);
+		if (n < 0) 
+				printf("ERROR writing to socket");
 		n = write(sockfd,(char*)(&(fmt.fmt.pix.width)),4);
 		if (n < 0) 
 				printf("ERROR writing to socket");
@@ -297,70 +307,7 @@ int capture_and_send_image(int fd, int sockfd)
 		}
 		return 0;
 }
-/*
-   int capture_and_send_image(int fd, int sockfd)
-   {
-   static fd_set fds;
-   static char camActive = 0;
-   char rec;
-   struct v4l2_buffer buf = {0};
-   int n,i;
-   char *bufferptr;
-   int framesize;
-   buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-   buf.memory = V4L2_MEMORY_MMAP;
-// buf.index = 0;
-if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
-{
-perror("Query Buffer");
-return 1;
-}
 
-if(!camActive){ 
-if(-1 == xioctl(fd, VIDIOC_STREAMON, &buf.type))
-{
-perror("Start Capture");
-return 1;
-}
-
-FD_ZERO(&fds);
-FD_SET(fd, &fds);
-camActive = 1;
-}
-
-struct timeval tv = {0};
-tv.tv_sec = 2;
-int r = select(fd+1, &fds, NULL, NULL, &tv);
-if(-1 == r)
-{
-perror("Waiting for Frame");
-return 1;
-}
-
-if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
-{
-perror("Retrieving Frame");
-return 1;
-}
-
-
-n = write(sockfd,(char*)&buf.bytesused,4);
-if (n < 0) 
-printf("ERROR writing to socket");
-bufferptr = buffers[buf.index].start;
-framesize = buf.bytesused;
-while( (n = write(sockfd,bufferptr,framesize)) != framesize){
-if (n < 0) 
-printf("ERROR writing to socket");
-bufferptr += n;
-framesize -= n;
-}
-n = read(sockfd,&rec,1);
-
-// cvWaitKey(1);
-
-return 0;
-}*/
 void ctrlC(int sig){ // can be called asynchronously
 		int i;
 		for(i = 0; i < n_buffers; i++){
@@ -388,8 +335,10 @@ int sock_init(struct hostent *server, int portno){
 						(char *)&serv_addr.sin_addr.s_addr,
 						server->h_length);
 		serv_addr.sin_port = htons(portno);
-		if (connect(netfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
-				printf("ERROR connecting");
+		if (connect(netfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+				printf("ERROR connecting to server\n");
+				exit(-1);
+		}
 		return netfd;
 }
 
@@ -400,7 +349,7 @@ static void usage(FILE *fp, int argc, char **argv)
                  "Options:\n"
                  "-d | --device name   Video device name [%s]\n"
                  "-h | --help          Print this message\n"
-                 "-f | --format        [h264] or [mjpeg]\n"
+                 "-f | --format        [H264] or [MJPG]\n"
 		 		 "-x | --width         Frame width [640]\n"
 		 		 "-y | --height        Frame height [480]\n"
 		 		 "-p | --port          Server port [5000]\n"
@@ -429,7 +378,7 @@ long_options[] = {
 int main(int argc, char *argv[])
 {
 		camera_device = "/dev/video0";
-		frame_fmt ="mjpeg";
+		frame_fmt ="MJPG";
 		int portno = 5000;
 		int fd, n;
 		
@@ -496,27 +445,7 @@ int main(int argc, char *argv[])
                 }
         }		
 
-		// switch(argc){
-		// 		case 3:
-		// 				width = 640;
-		// 				height = 480;
-		// 				strcat(camera_device,"0");
-		// 				break;
-		// 		case 5:
-		// 				width = atoi(argv[3]);
-		// 				height = atoi(argv[4]);
-		// 				strcat(camera_device,"0");
-		// 				break;
-		// 		case 6:
-		// 				width = atoi(argv[3]);
-		// 				height = atoi(argv[4]);
-		// 				strcat(camera_device,argv[5]);
-		// 				break;
-		// 		default:
-		// 				printf("Usage: ./CVclient <server ip> <server port> <video width> <video hight> <camera device>\n");
-		// 				return -1; 
-		// }
-		// portno = atoi(argv[2]);
+
 		sockfd = sock_init(server, portno);
 
 
