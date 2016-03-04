@@ -35,6 +35,17 @@ int 			 height = 480;
 char 			*frame_fmt;
 int              frame_count = 100;
 
+void ctrlC(int sig){ // can be called asynchronously
+		int i;
+		for(i = 0; i < n_buffers; i++){
+				if (-1 == munmap(buffers[i].start, buffers[i].length))
+						fprintf(stderr,"munmap error!\n");
+		}
+		if (-1 == close(camerafd))
+				fprintf(stderr,"close");
+		printf("ByeBye!!\n");
+		exit(0);
+}
 static void errno_exit(const char *s)
 {
         fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
@@ -286,6 +297,7 @@ int capture_and_send_image(int fd, int sockfd)
 				n = write(sockfd,(char*)&buf.bytesused,4);
 				if (n < 0) {
 						printf("ERROR writing to socket");
+						ctrlC(0);
 						return -1;
 				}
 
@@ -294,6 +306,7 @@ int capture_and_send_image(int fd, int sockfd)
 				while( (n = write(sockfd,bufferptr,framesize)) != framesize){
 						if (n < 0){
 								printf("ERROR writing to socket");
+								ctrlC(0);
 								return -1;
 						}
 						bufferptr += n;
@@ -308,17 +321,7 @@ int capture_and_send_image(int fd, int sockfd)
 		return 0;
 }
 
-void ctrlC(int sig){ // can be called asynchronously
-		int i;
-		for(i = 0; i < n_buffers; i++){
-				if (-1 == munmap(buffers[i].start, buffers[i].length))
-						fprintf(stderr,"munmap error!\n");
-		}
-		if (-1 == close(camerafd))
-				fprintf(stderr,"close");
-		printf("ByeBye!!\n");
-		exit(0);
-}
+
 
 int sock_init(struct hostent *server, int portno){
 		int netfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -337,6 +340,7 @@ int sock_init(struct hostent *server, int portno){
 		serv_addr.sin_port = htons(portno);
 		if (connect(netfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
 				printf("ERROR connecting to server\n");
+				ctrlC(0);
 				exit(-1);
 		}
 		return netfd;
