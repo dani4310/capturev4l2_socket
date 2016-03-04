@@ -30,6 +30,10 @@
 #define YELLOW "\033[1;33m"
 #define CLOSE_COLOR "\033[0m"
 
+
+#define FORMATE_MJPG 1
+#define FORMATE_H264 2
+
 int width, height;
 #ifdef FACEDETECT
 	CvMemStorage* facesMemStorage;
@@ -60,24 +64,28 @@ long long getSystemTime() {
 		ftime(&t);
 		return 1000 * t.time + t.millitm;
 }
-void PrintFrameMsg(int current,long long fps,long long speed, char *fourcc){
+void PrintFrameMsg(int current,double fps,long long speed, char *fourcc){
 	int i;
 	printf("\r");
 	for(i = 0; i<current%3; i++){
 		printf("\t\t\t\t\t");
 	}
-	printf("[camera%d "LIGHT_RED"%s"CLOSE_COLOR YELLOW"%3lld"CLOSE_COLOR"FPS "YELLOW"%4lld"CLOSE_COLOR"B/s]",current, fourcc, fps, speed);
+	printf("[camera%d "LIGHT_RED"%s"CLOSE_COLOR YELLOW" %.3f"CLOSE_COLOR"FPS "YELLOW"%4lld"CLOSE_COLOR"B/s]",current, fourcc, fps, speed);
 	for(i = 0; i<3 - current%3; i++){
 		printf("\t\t\t\t\t");
 	}
 	fflush(stdout);
 }
 
-void ffmpeg_init(int width, int height){
+void ffmpeg_init(int width, int height, int formate){
    av_register_all();
    avcodec_register_all();
    avformat_network_init();
-   m_ffmpeg.codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+   if(formate == FORMATE_H264){
+	   m_ffmpeg.codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+	}else if(formate == FORMATE_MJPG){ 
+	   m_ffmpeg.codec = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
+	}
    if (!m_ffmpeg.codec) 
    {
       fprintf(stderr, "Codec not found\n");
@@ -90,7 +98,7 @@ void ffmpeg_init(int width, int height){
       exit(1);
    }
    avcodec_get_context_defaults3(m_ffmpeg.context, m_ffmpeg.codec);
-   m_ffmpeg.context->flags |= CODEC_FLAG_LOW_DELAY;
+   // m_ffmpeg.context->flags |= CODEC_FLAG_LOW_DELAY;
    m_ffmpeg.context->flags2 |= CODEC_FLAG2_CHUNKS;
    m_ffmpeg.context->thread_count = 4;
    m_ffmpeg.context->thread_type = FF_THREAD_FRAME;
@@ -100,7 +108,7 @@ void ffmpeg_init(int width, int height){
       fprintf(stderr, "Could not open codec\n");
       exit(1);
    }
-
+   
    m_ffmpeg.frame_yuv = av_frame_alloc();
    if (!m_ffmpeg.frame_yuv) 
    {
@@ -147,10 +155,9 @@ IplImage *facedetect(IplImage* image_detect){
 		return frame;
 }
 #endif
-static void process_image(void *p, int size, uint8_t H264)
+static void process_image(void *p, int size, char* fourcc)
 {
 	static first_time = 1;
-	if(H264){
 	    IplImage *cpimgrgb;
 	    AVPacket packet;
 	    av_init_packet(&packet);
@@ -176,8 +183,8 @@ static void process_image(void *p, int size, uint8_t H264)
 #ifdef FACEDETECT
 	        cpimgrgb =facedetect(cpimgrgb);
 #endif
-	        cvNamedWindow("H264",CV_WINDOW_AUTOSIZE);
-	        cvShowImage("H264", cpimgrgb);
+	        cvNamedWindow(fourcc,CV_WINDOW_AUTOSIZE);
+	        cvShowImage(fourcc, cpimgrgb);
 	        cvWaitKey(1);
 	        cvReleaseImage(&cpimgrgb); 
 	        // sws_freeContext(m_ffmpeg.sws_context);
@@ -185,22 +192,7 @@ static void process_image(void *p, int size, uint8_t H264)
 	        fprintf(stderr, "avcodec errror!!\n");
 	    } 
 	    av_free_packet(&packet);
-	}else{
-		CvMat cvmat = cvMat(height, width, CV_8UC3, (void*)p);
-#ifdef FACEDETECT
-		IplImage* image_detect;
-		image_detect = cvDecodeImage(&cvmat, 1);
-		IplImage* frame =facedetect(image_detect);
-#endif
-#ifndef FACEDETECT
-		IplImage* frame = cvDecodeImage(&cvmat, 1);
-#endif
-		cvNamedWindow("MJPEG",CV_WINDOW_AUTOSIZE);
-		cvShowImage("MJPEG", frame);
-		cvReleaseImage(&frame);
-		cvWaitKey(1);
-	}
-                
+               
 }
 
 
@@ -217,7 +209,7 @@ int main(int argc, char *argv[])
 		long long start, end;
 		int current = 0;
 		char fourcc[5];
-		uint8_t H264_flag =0;
+		uint32_t formate_type =0;
 
 
 		// startWindowThread();
@@ -270,14 +262,15 @@ int main(int argc, char *argv[])
 						}
 						if(strncmp(fourcc,"H264",4) == 0){
 							fourcc[4] = '\0';
-							ffmpeg_init(width, height);
-							H264_flag = 1;
+							formate_type = FORMATE_H264;
 						}else if(strncmp(fourcc,"MJPG",4) == 0){
 							fourcc[4] = '\0';
+							formate_type = FORMATE_MJPG;
 						}else{
 							fprintf(stderr,"Image formate error! message:[%s]\n",fourcc);
 							exit(-1);
 						}
+						ffmpeg_init(width, height, formate_type);
 
 						if(read(newsockfd, (char*) &buffersize, 4) == 0){
 								PrintFrameMsg(current, 0, 0, fourcc);
@@ -331,13 +324,13 @@ int main(int argc, char *argv[])
 
 
 
-								process_image(buffer, framesize, H264_flag);
+								process_image(buffer, framesize, fourcc);
 
 								frame_num++;
 								if(frame_num == 20){
 									end = getSystemTime();
 									frame_num = 0;
-									PrintFrameMsg(current, 20000/(end - start), frame_totalsize/(end - start), fourcc);
+									PrintFrameMsg(current, 20000.0/(end - start), frame_totalsize/(end - start), fourcc);
 									// printf("\r\t\t\t\t\t\t\t\t\t\t\t%lldB/s",);
 								}
 						}
