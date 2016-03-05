@@ -70,7 +70,7 @@ void PrintFrameMsg(int current,double fps,long long speed, char *fourcc){
 	for(i = 0; i<current%3; i++){
 		printf("\t\t\t\t\t");
 	}
-	printf("[camera%d "LIGHT_RED"%s"CLOSE_COLOR YELLOW" %.3f"CLOSE_COLOR"FPS "YELLOW"%4lld"CLOSE_COLOR"B/s]",current, fourcc, fps, speed);
+	printf("[camera%d "LIGHT_RED"%s"CLOSE_COLOR YELLOW" %.3f"CLOSE_COLOR"FPS "YELLOW"%4lld"CLOSE_COLOR"KB/s]",current, fourcc, fps, speed);
 	for(i = 0; i<3 - current%3; i++){
 		printf("\t\t\t\t\t");
 	}
