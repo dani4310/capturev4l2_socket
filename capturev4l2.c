@@ -133,7 +133,7 @@ int print_caps(int fd, int sockfd)
 		//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY;
 		if(strncmp(frame_fmt,"MJPG",4) == 0){
 			fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-		}else if(strncmp(frame_fmt,"H264",4)){
+		}else if(strncmp(frame_fmt,"H264",4) == 0){
 			fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_H264;
 		}else{
 			fprintf(stderr,"formate error!\n");
