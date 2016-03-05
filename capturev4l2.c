@@ -253,7 +253,6 @@ int capture_and_send_image(int fd, int sockfd)
 		if (-1 == xioctl(fd, VIDIOC_STREAMON, &type))
 				printf("VIDIOC_STREAMON");
 
-		cvNamedWindow("window",CV_WINDOW_AUTOSIZE);
 		while(1){
 
 				fd_set fds;
