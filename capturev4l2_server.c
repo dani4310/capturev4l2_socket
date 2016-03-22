@@ -29,7 +29,9 @@
 #define LIGHT_RED "\033[1;31m"
 #define YELLOW "\033[1;33m"
 #define CLOSE_COLOR "\033[0m"
-
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55,28,1)
+#define av_frame_alloc  avcodec_alloc_frame
+#endif
 
 #define FORMATE_MJPG 1
 #define FORMATE_H264 2
